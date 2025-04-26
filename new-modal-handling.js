@@ -63,11 +63,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
       modalContent.appendChild(clone);
-      const existingJob = Array.from(jobDataMap.values()).find(j => j.fileName === file.fileName);
-if (!existingJob) {
-  const newJob = createJobFromFile(file.fileName, file.quantity || 1, false);
-  console.log("Pre-created job for modal:", newJob);
-}
+
 
     });
     initTagAndDistributeListeners(); // Called after cloning demo-q-file elements
