@@ -119,6 +119,8 @@ if (!existingJob) {
 
 
       confirmedJobs.forEach(job => {
+  assignJobsToPrinters(confirmedJobs);
+        console.log("Jobs assigned");
   const clone = queuedJobTemplate.cloneNode(true);
   clone.style.display = "flex";
   clone.removeAttribute('id');
