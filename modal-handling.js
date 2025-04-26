@@ -54,10 +54,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
       const qtyInput = clone.querySelector(".filament-weight-wrap.q-qty input");
       const tempInput = clone.querySelector(".filament-weight-wrap.release-temp input");
-
+      const distCheckbox = clone.querySelector(".distribute-checkbox");
 
       if (qtyInput) qtyInput.value = file.quantity || 1;
       if (tempInput) tempInput.value = file.defaultReleaseTemp || 29;
+      if (distCheckbox) distCheckbox.checked = file.distribute || true;
+
 
 
       modalContent.appendChild(clone);
@@ -170,8 +172,12 @@ if (!existingJob) {
   clone.querySelector(".qty").textContent = job.quantity;
   clone.querySelector(".weight").textContent = job.filamentWeight || '--';
   clone.querySelector(".time").textContent = job.printTime;
-  clone.querySelector(".file-text:nth-of-type(6)").textContent = job.jobID || '--';
+  //clone.querySelector(".file-text:nth-of-type(10)").textContent = job.jobID || '--';
 
+const distributeCheckbox = clone.querySelector(".file-text.jobs .w-embed input[type='checkbox']");
+if (distributeCheckbox) {
+  distributeCheckbox.checked = job.distribute;
+}
 
           queueBackground.appendChild(clone);
         });
