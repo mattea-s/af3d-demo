@@ -166,7 +166,8 @@ function createJobFromFile(fileName, quantity = 1, distribute = false) {
     jobStatus: "q",
     matchingPrinters: matches,
     matchingPrinterNames: matches.map(p => p.name),
-    matchingPrinterStatuses: matches.map(p => p.status)
+    matchingPrinterStatuses: matches.map(p => p.status),
+    printedSoFar: 0
   };
 
 
