@@ -130,68 +130,45 @@ function initializePrinterData() {
 
 // Job Creation
 function createJobFromFile(fileName, quantity = 1, distribute = false) {
+  if (!fileName) return null;
+
+  jobIDCounter++;
+  const jobID = `j${jobIDCounter}`;
+
   const fileData = fileDataMap.get(fileName);
-  if (!fileData) return;
+  if (!fileData) {
+    console.error(`❌ File data not found for ${fileName}`);
+    return null;
+  }
 
-
-  const jobID = `j${jobIdCounter++}`;
-  const jobPrintTime = fileData.printTime * quantity;
-  const jobPrintConverted = convertMinutes(jobPrintTime);
-
-
-  const matches = getMatchingPrintersForTags(fileData.defaultTags);
-
+  const matchingPrinters = getMatchingPrinters(fileData.defaultTags || []);
+  const matchingPrinterNames = matchingPrinters.map(p => p.name);
 
   const jobData = {
-    jobID,
-    fileName: fileData.fileName,
-    tags: [...fileData.defaultTags],
-    tagsNum: fileData.defaultTags.length,
-    quantity,
-    distribute,
-    printTime: fileData.printTime,
-    printHours: fileData.printHours,
-    printMins: fileData.printMins,
-    jobPrintTime,
-    jobPrintHours: jobPrintConverted.hours,
-    jobPrintMins: jobPrintConverted.minutes,
-    filamentWeight: fileData.filamentWeight,
-    zHeight: fileData.zHeight,
-    defaultReleaseTemp: fileData.defaultReleaseTemp,
+    jobID: jobID,
+    fileName: fileName,
+    quantity: quantity,
+    tags: fileData.defaultTags || [],
+    tagsNum: fileData.defaultTagsNum || 0,
+    printTime: fileData.printTime || '--',
+    printHours: fileData.printHours || 0,
+    printMins: fileData.printMins || 0,
+    defaultReleaseTemp: fileData.defaultReleaseTemp || 29,
+    filamentWeight: fileData.filamentWeight || '--',
+    distribute: distribute,
+    matchingPrinters: matchingPrinters,
+    matchingPrinterNames: matchingPrinterNames,
     jobProgQueued: quantity,
     jobProgProd: 0,
     jobProgCol: 0,
     jobProgDone: 0,
     jobProgressTotal: 0,
-    jobStatus: "q",
-    matchingPrinters: matches,
-    matchingPrinterNames: matches.map(p => p.name),
-    matchingPrinterStatuses: matches.map(p => p.status),
-    printedSoFar: 0
+    assignedPrinterName: null, // For non-distributed locking
   };
-
 
   jobDataMap.set(jobID, jobData);
 
-
-  matches.forEach(match => {
-    const printer = printerDataMap.get(match.name);
-    if (printer) {
-      printer.compatibleJobs.push(jobID);
-    }
-  });
-
-
-  console.log("Created Job:", jobData);
-  if (matches.length === 0) {
-    console.log(`Job ${jobID} has no matching printers.`);
-  } else {
-    console.log(`Job ${jobID} has ${matches.length} matching printer(s):`);
-    matches.forEach(p => {
-      console.log(`- ${p.name} (Status: ${p.status})`);
-    });
-  }
-
+  console.log(`✅ Created job ${jobID} for file ${fileName}`);
 
   return jobData;
 }
