@@ -79,111 +79,40 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
   if (confirmSendBtn) {
-    confirmSendBtn.addEventListener("click", () => {
-      const confirmedJobs = [];
-      const fileItems = modal.querySelectorAll(".demo-q-file");
+  confirmSendBtn.addEventListener("click", () => {
+    console.log("🔵 Confirm Send clicked.");
 
+    // 🚨 1. Clear any dirty pre-created jobs
+    jobDataMap.clear();
+    jobIDCounter = 0;
 
-      fileItems.forEach(item => {
-        const fileName = item.querySelector(".filename.q-send")?.textContent.trim();
-        const qtyInput = item.querySelector(".q-qty input");
-        const quantity = qtyInput ? parseInt(qtyInput.value) || 1 : 1;
-        const distCheckbox = item.querySelector(".distribute input[type='checkbox']");
-        const distribute = distCheckbox ? distCheckbox.checked : false;
+    const confirmedJobs = [];
+    const fileItems = modal.querySelectorAll(".demo-q-file");
 
+    fileItems.forEach(item => {
+      const fileName = item.querySelector(".filename.q-send")?.textContent.trim();
+      const qtyInput = item.querySelector(".q-qty input");
+      const quantity = qtyInput ? parseInt(qtyInput.value) || 1 : 1;
+      const distCheckbox = item.querySelector(".distribute input[type='checkbox']");
+      const distribute = distCheckbox ? distCheckbox.checked : false;
 
-        if (fileName) {
-          const newJob = createJobFromFile(fileName, quantity, distribute);
-          if (newJob) {
-            confirmedJobs.push(newJob);
-          }
+      if (fileName) {
+        const newJob = createJobFromFile(fileName, quantity, distribute);
+        if (newJob) {
+          confirmedJobs.push(newJob);
         }
-      });
-
-
-      console.log("Confirmed Jobs (Structured):", confirmedJobs);
-
-
-      const queueBackground = document.querySelector(".demo-q-background");
-      const queuedJobTemplate = document.getElementById("queued-job-template");
-
-
-      if (!queuedJobTemplate) {
-        console.error("Template not found!");
-        return;
       }
+    });
 
+    console.log("✅ Confirmed Jobs (Structured):", confirmedJobs);
 
-      confirmedJobs.forEach(job => {
-  assignJobsToPrinters(confirmedJobs);
-        console.log("Jobs assigned");
-  const clone = queuedJobTemplate.cloneNode(true);
-  clone.style.display = "flex";
-  clone.removeAttribute('id');
+    assignJobsToPrinters(confirmedJobs);
 
+    console.log("🚀 Jobs assigned");
 
-  clone.querySelector(".filename").textContent = job.fileName;
-  clone.querySelector(".jobs.ul").textContent = `${job.matchingPrinters.length} Matching`;
-
-
-  const tagsContainer = clone.querySelector(".tags .default-file-tags");
-  tagsContainer.querySelectorAll(".demo-tag").forEach(tag => tag.remove());
-  job.tags.forEach(tag => {
-    const tagDiv = document.createElement("div");
-    tagDiv.className = "demo-tag";
-    tagDiv.style.display = "flex";
-    tagDiv.textContent = tag;
-    tagsContainer.appendChild(tagDiv);
+    ["Queued", "In Production", "Collect", "Blocked"].forEach(countVisibleJobs);
   });
-
-
-  // Replace or duplicate .matching-printers-text elements
-  const popup = clone.querySelector(".matching-printers-popup");
-  const printerTextTemplate = popup.querySelector(".matching-printers-text");
-  popup.querySelectorAll(".matching-printers-text").forEach(el => el.remove());
-
-
-  if (job.matchingPrinterNames.length > 0) {
-    const container = popup.querySelector(".div-block-453") || popup;
-    job.matchingPrinters.forEach(p => {
-      const printerText = printerTextTemplate.cloneNode(true);
-      printerText.textContent = `${p.name} - ${p.status.toUpperCase()}`;
-      container.appendChild(printerText);
-    });
-  }
-
-
-  // Show popup on hover only if there are matching printers
-  const hoverTarget = clone.querySelector(".file-text.jobs.ul");
-  if (job.matchingPrinterNames.length > 0) {
-    hoverTarget.addEventListener("mouseenter", () => {
-      popup.style.display = "block";
-    });
-    hoverTarget.addEventListener("mouseleave", () => {
-      popup.style.display = "none";
-    });
-  } else {
-    popup.style.display = "none";
-  }
-
-
-  clone.querySelector(".qty").textContent = job.quantity;
-  clone.querySelector(".weight").textContent = job.filamentWeight || '--';
-  clone.querySelector(".time").textContent = job.printTime;
-  //clone.querySelector(".file-text:nth-of-type(10)").textContent = job.jobID || '--';
-
-const distributeCheckbox = clone.querySelector(".file-text.jobs .w-embed input[type='checkbox']");
-if (distributeCheckbox) {
-  distributeCheckbox.checked = job.distribute;
 }
-
-          queueBackground.appendChild(clone);
-        });
-
-
-        ["Queued", "In Production", "Collect", "Blocked"].forEach(countVisibleJobs);
-    });
-  }
 
 
   function countVisibleJobs(tabName) {
