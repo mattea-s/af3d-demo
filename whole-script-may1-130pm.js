@@ -1,4 +1,4 @@
-<script>
+
   // Hash-based tab nav src="https://cdn.jsdelivr.net/gh/mattea-s/af3d-demo@main/working-code.js"
 $(document).on('click', '.tag-modal-background.w-inline-block', function() {
   console.log("Tag Modal Clicked");
@@ -122,9 +122,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   updateSelectedCount();
 });
-</script>
 
-<script>
 // Data file structure src="https://cdn.jsdelivr.net/gh/mattea-s/af3d-demo@main/apr28-map-structure.js"
   // Maps and Infrastructure Setup
 const fileDataMap = new Map();
@@ -332,9 +330,8 @@ document.addEventListener("DOMContentLoaded", function () {
   initializeFileData();
   initializePrinterData();
 });
-</script>
 
-<script>
+
 // Modal Handling and Job Creation  src="https://cdn.jsdelivr.net/gh/mattea-s/af3d-demo@main/apr26-modal-handling.js"
 document.addEventListener("DOMContentLoaded", function () {
   const sendButton = document.getElementById("send-button");
@@ -536,9 +533,9 @@ if (distributeCheckbox) {
   console.log(`Tab '${tabName}' has ${realJobCount} real jobs.`);
 }
 });
-</script>
 
-<script>
+
+
 // Plus/Minus Buttons for Quantity and Temp  src="https://cdn.jsdelivr.net/gh/mattea-s/af3d-demo@main/qty-temp-btn.js"
 document.addEventListener("click", function (e) {
   const fileName = e.target.closest(".demo-q-file")
@@ -586,9 +583,9 @@ document.addEventListener("click", function (e) {
     }
   }
 });
-</script>
 
-<script>
+
+
 // Queue tagging src="https://cdn.jsdelivr.net/gh/mattea-s/af3d-demo@main/queue-tagging.js"
 function updateDefaultTagsUI(container, tagList) {
   console.log("🔵 [updateDefaultTagsUI] Starting sync...");
@@ -800,11 +797,9 @@ function initTagAndDistributeListeners() {
     });
   });
 }
-</script>
 
-<script>
 // Sends jobs to printers and prints    src="https://cdn.jsdelivr.net/gh/mattea-s/af3d-demo@main/new-job-printer-handling.js"
-  function assignJobsToPrinters(jobs) {
+/*  function assignJobsToPrinters(jobs) {
   console.log("🚀 Assigning jobs to printers...");
   const assignedPrinters = new Set(); // 🔒 Prevents double assignment in this round
 
@@ -876,6 +871,91 @@ function initTagAndDistributeListeners() {
       console.log(`🖨️ Non-distributed: Started first print of ${job.jobID} (${quantity} total) on ${printerName}`);
     }
   });
+}*/
+
+function assignJobsToPrinters(jobs) {
+  console.log("🚀 Assigning jobs to printers...");
+
+  const assignedPrinters = new Set(); // Only for this assignment pass
+
+  for (const job of jobs) {
+    const matchingPrinters = job.matchingPrinterNames || [];
+    const quantityRemaining = job.jobProgQueued;
+
+    if (matchingPrinters.length === 0 || quantityRemaining <= 0) {
+      continue;
+    }
+
+    const availablePrinters = matchingPrinters.filter(p =>
+      isPrinterIdle(p) && !assignedPrinters.has(p)
+    );
+
+    if (job.distribute) {
+      const assignCount = Math.min(availablePrinters.length, quantityRemaining);
+
+      for (let i = 0; i < assignCount; i++) {
+        const printerName = availablePrinters[i];
+        const printerCard = findPrinterCardByName(printerName);
+        if (!printerCard) continue;
+
+        // ✅ Mark printer assigned for this batch
+        assignedPrinters.add(printerName);
+
+        // ✅ Update job progress
+        job.jobProgQueued = Math.max(0, job.jobProgQueued - 1);
+        job.jobProgProd++;
+        job.jobProgressTotal =
+          job.jobProgQueued + job.jobProgProd + job.jobProgCol + job.jobProgDone;
+
+        const printedSoFar = job.quantity - job.jobProgQueued;
+
+        populatePrinterCard(printerCard, job, printedSoFar, job.quantity);
+
+        // ✅ Track printer for collection
+        if (!job.assignedPrinterNames.includes(printerName)) {
+          job.assignedPrinterNames.push(printerName);
+        }
+
+        console.log(`🖨️ Distributed: Assigned iteration ${printedSoFar} of ${job.quantity} for ${job.jobID} to ${printerName}`);
+      }
+
+    } else {
+      // Non-distributed job — must go to a single printer
+      if (job.assignedPrinterName) {
+        console.log(`🔒 Job ${job.jobID} already assigned to ${job.assignedPrinterName}`);
+        continue;
+      }
+
+      const printerName = availablePrinters[0];
+      if (!printerName) {
+        console.warn(`⚠️ No idle compatible printer for non-distributed job ${job.jobID}`);
+        continue;
+      }
+
+      const printerCard = findPrinterCardByName(printerName);
+      if (!printerCard) continue;
+
+      // ✅ Mark printer assigned for this batch
+      assignedPrinters.add(printerName);
+
+      // ✅ Lock job to this printer
+      job.assignedPrinterName = printerName;
+
+      job.jobProgQueued = Math.max(0, job.jobProgQueued - 1);
+      job.jobProgProd++;
+      job.jobProgressTotal =
+        job.jobProgQueued + job.jobProgProd + job.jobProgCol + job.jobProgDone;
+
+      populatePrinterCard(printerCard, job, 1, job.quantity);
+
+      // ✅ Track printer for collection
+      if (!job.assignedPrinterNames.includes(printerName)) {
+        job.assignedPrinterNames.push(printerName);
+      }
+
+      console.log(`🖨️ Non-distributed: Assigned ${job.jobID} to ${printerName}`);
+    }
+  }
 }
 
 function findPrinterCardByName(printerName) {
@@ -1135,4 +1215,3 @@ function assignJobToPrinter(printerCard, job) {
     job.activePrinterNames.push(printerName);
   }
 }
-</script>
