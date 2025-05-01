@@ -753,14 +753,19 @@ function initTagAndDistributeListeners() {
         tagWrap.style.display = job.tags.includes(tag) ? 'none' : 'flex';
 
         tagEl.onclick = () => {
+            console.log("New tag clicked");
           
             addTagToJob(jobID, tag);
+            console.log("Tag added to job");
 
             addTagToModal(tag, currentTagsWrap);
+            console.log("Tag added to modal");
 
             const defaultTagsContainer = fileBlock.querySelector('.default-file-tags.tags');
             if (defaultTagsContainer) {
-              updateDefaultTagsUI(defaultTagsContainer, job.tags);
+              const updatedJob = jobDataMap.get(jobID);
+              updateDefaultTagsUI(defaultTagsContainer, updatedJob?.tags || []);
+              console.log("Tag added to default tags div");
             }
 
             if (tagWrap) tagWrap.style.display = 'none';
@@ -768,18 +773,23 @@ function initTagAndDistributeListeners() {
         });
 
       currentTagsWrap.onclick = (e) => {
+        console.log("Remove tag clicked");
         const clicked = e.target.closest('.demo-tag.in-modal');
         if (!clicked) return;
 
         const tag = clicked.textContent.trim();
 
         removeTagFromJob(jobID, tag);
+        console.log("Tag removed from job");
 
         removeTagFromModal(tag, currentTagsWrap);
+        console.log("Tag removed from modal");
 
         const defaultTagsContainer = fileBlock.querySelector('.default-file-tags.tags');
         if (defaultTagsContainer) {
-          updateDefaultTagsUI(defaultTagsContainer, job.tags);
+          const updatedJob = jobDataMap.get(jobID);
+          updateDefaultTagsUI(defaultTagsContainer, updatedJob?.tags || []);
+          console.log("Tag removed from default tags list");
         }
 
         const restoreWrap = Array.from(tagListWrap.querySelectorAll('.tag-in-list-wrap')).find(w =>
