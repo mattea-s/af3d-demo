@@ -361,50 +361,50 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
   function populateSendModal(files) {
-  const modalContent = document.getElementById("modal-content");
-  const template = document.getElementById("file-entry-template");
+    const modalContent = document.getElementById("modal-content");
+    const template = document.getElementById("file-entry-template");
+  
+    modalContent.querySelectorAll(".demo-q-file").forEach(el => el.remove());
+  
+    files.forEach(file => {
+      const fileName = file.fileName;
+      const clone = template.cloneNode(true);
+      clone.style.display = "flex";
+  
+      clone.querySelector(".filename.q-send").textContent = fileName;
 
-  modalContent.querySelectorAll(".demo-q-file").forEach(el => el.remove());
+      // 🌟 Pull live job if it exists
+      const job = Array.from(jobDataMap.values()).find(j => j.fileName === fileName);
+      const effectiveData = job || file;
 
-  files.forEach(file => {
-    const fileName = file.fileName;
-    const clone = template.cloneNode(true);
-    clone.style.display = "flex";
+      // 🏷️ Tags
+      const tagsContainer = clone.querySelector(".tags");
+      tagsContainer.querySelectorAll(".demo-tag").forEach(tag => tag.remove());
+      (effectiveData.tags || effectiveData.defaultTags || []).forEach(tag => {
+        const tagDiv = document.createElement("div");
+        tagDiv.className = "demo-tag";
+        tagDiv.style.display = "flex";
+        tagDiv.textContent = tag;
+        tagsContainer.appendChild(tagDiv);
+      });
 
-    clone.querySelector(".filename.q-send").textContent = fileName;
+      // 🔢 Quantity
+      const qtyInput = clone.querySelector(".filament-weight-wrap.q-qty input");
+      if (qtyInput) qtyInput.value = effectiveData.quantity ?? 1;
 
-    // 🌟 Pull live job if it exists
-    const job = Array.from(jobDataMap.values()).find(j => j.fileName === fileName);
-    const effectiveData = job || file;
+      // 🌡️ Temp
+      const tempInput = clone.querySelector(".filament-weight-wrap.release-temp input");
+      if (tempInput) tempInput.value = effectiveData.releaseTemp ?? effectiveData.defaultReleaseTemp ?? 29;
 
-    // 🏷️ Tags
-    const tagsContainer = clone.querySelector(".tags");
-    tagsContainer.querySelectorAll(".demo-tag").forEach(tag => tag.remove());
-    (effectiveData.tags || effectiveData.defaultTags || []).forEach(tag => {
-      const tagDiv = document.createElement("div");
-      tagDiv.className = "demo-tag";
-      tagDiv.style.display = "flex";
-      tagDiv.textContent = tag;
-      tagsContainer.appendChild(tagDiv);
+      // ✅ Distribute
+      const distCheckbox = clone.querySelector(".distribute-checkbox");
+      if (distCheckbox) distCheckbox.checked = effectiveData.distribute ?? true;
+
+      modalContent.appendChild(clone);
     });
 
-    // 🔢 Quantity
-    const qtyInput = clone.querySelector(".filament-weight-wrap.q-qty input");
-    if (qtyInput) qtyInput.value = effectiveData.quantity ?? 1;
-
-    // 🌡️ Temp
-    const tempInput = clone.querySelector(".filament-weight-wrap.release-temp input");
-    if (tempInput) tempInput.value = effectiveData.releaseTemp ?? effectiveData.defaultReleaseTemp ?? 29;
-
-    // ✅ Distribute
-    const distCheckbox = clone.querySelector(".distribute-checkbox");
-    if (distCheckbox) distCheckbox.checked = effectiveData.distribute ?? true;
-
-    modalContent.appendChild(clone);
-  });
-
-  initTagAndDistributeListeners();
-}
+    initTagAndDistributeListeners();
+  }
 
   if (sendButton) {
     sendButton.addEventListener("click", () => {
