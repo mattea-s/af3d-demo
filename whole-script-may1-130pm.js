@@ -723,15 +723,20 @@ function initTagAndDistributeListeners() {
       currentTagsWrap.querySelectorAll(".demo-tag.in-modal:not([style*='display: none'])").forEach(tag => tag.remove());
       job.tags.forEach(tag => addTagToModal(tag, currentTagsWrap));
       updateDefaultTagsUI(fileBlock.querySelector('.default-file-tags.tags'), job.tags);
+    
+      document.querySelectorAll('.distribute-checkbox').forEach(cb => {
+        cb.addEventListener('change', function () {
+          const wrapper = this.closest('.demo-q-file');
+          const fileName = wrapper.querySelector('.filename.q-send')?.textContent.trim();
+          const job = Array.from(jobDataMap.values()).find(j => j.fileName === fileName);
+          if (job) {
+            job.distribute = this.checked;
+            jobDataMap.set(job.jobID, structuredClone(job));
+            console.log("🔄 [jobDataMap] Updated distribute:", job.jobID, job.distribute);
+          }
+        });
+      });
 
-/*    document.querySelectorAll('.distribute-checkbox').forEach(cb => {
-  cb.addEventListener('change', function () {
-    const wrapper = this.closest('.demo-q-file');
-    const fileName = wrapper.querySelector('.filename.q-send')?.textContent.trim();
-    const job = Array.from(jobDataMap.values()).find(j => j.fileName === fileName);
-    if (job) job.distribute = this.checked;
-  });
-});*/
 
 
     // On click
