@@ -709,7 +709,7 @@ function initTagAndDistributeListeners() {
       if (!job) {
         const fileData = fileDataMap.get(fileName);
         if (!fileData) return;
-        job = createJobFromFile(fileName, fileData.quantity || 1, false);
+        job = createJobFromFile(fileName, fileData.quantity || 1, true);
       }
 
       if (!Array.isArray(job.tags)) {
