@@ -357,51 +357,53 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
 
-  function populateSendModal(files) {
-    const modalContent = document.getElementById("modal-content");
-    const template = document.getElementById("file-entry-template");
-  
-    modalContent.querySelectorAll(".demo-q-file").forEach(el => el.remove());
-  
-    files.forEach(file => {
-      const fileName = file.fileName;
-      const clone = template.cloneNode(true);
-      clone.style.display = "flex";
-  
-      clone.querySelector(".filename.q-send").textContent = fileName;
+ function populateSendModal(files) {
+  const modalContent = document.getElementById("modal-content");
+  const template = document.getElementById("file-entry-template");
 
-      // 🌟 Pull live job if it exists
-      const job = Array.from(jobDataMap.values()).find(j => j.fileName === fileName);
-      const effectiveData = job || file;
+  modalContent.querySelectorAll(".demo-q-file").forEach(el => el.remove());
 
-      // 🏷️ Tags
-      const tagsContainer = clone.querySelector(".tags");
-      tagsContainer.querySelectorAll(".demo-tag").forEach(tag => tag.remove());
-      (effectiveData.tags || effectiveData.defaultTags || []).forEach(tag => {
-        const tagDiv = document.createElement("div");
-        tagDiv.className = "demo-tag";
-        tagDiv.style.display = "flex";
-        tagDiv.textContent = tag;
-        tagsContainer.appendChild(tagDiv);
-      });
+  files.forEach(file => {
+    const fileName = file.fileName;
 
-      // 🔢 Quantity
-      const qtyInput = clone.querySelector(".filament-weight-wrap.q-qty input");
-      if (qtyInput) qtyInput.value = effectiveData.quantity ?? 1;
+    // 🆕 Always create a fresh job object
+    const job = createJobFromFile(fileName, 1, true); // quantity: 1, distribute: true (default)
+    jobDataMap.set(job.jobID, job);
 
-      // 🌡️ Temp
-      const tempInput = clone.querySelector(".filament-weight-wrap.release-temp input");
-      if (tempInput) tempInput.value = effectiveData.releaseTemp ?? effectiveData.defaultReleaseTemp ?? 29;
+    const clone = template.cloneNode(true);
+    clone.style.display = "flex";
+    clone.dataset.jobId = job.jobID; // 🆕 Attach jobID directly to modal block
+    clone.querySelector(".filename.q-send").textContent = fileName;
 
-      // ✅ Distribute
-      const distCheckbox = clone.querySelector(".distribute-checkbox");
-      if (distCheckbox) distCheckbox.checked = effectiveData.distribute ?? true;
 
-      modalContent.appendChild(clone);
+    // 🏷️ Tags
+    const tagsContainer = clone.querySelector(".tags");
+    tagsContainer.querySelectorAll(".demo-tag").forEach(tag => tag.remove());
+    job.tags.forEach(tag => {
+      const tagDiv = document.createElement("div");
+      tagDiv.className = "demo-tag";
+      tagDiv.style.display = "flex";
+      tagDiv.textContent = tag;
+      tagsContainer.appendChild(tagDiv);
     });
 
-    initTagAndDistributeListeners();
-  }
+    // 🔢 Quantity
+    const qtyInput = clone.querySelector(".filament-weight-wrap.q-qty input");
+    if (qtyInput) qtyInput.value = job.quantity;
+
+    // 🌡️ Temp
+    const tempInput = clone.querySelector(".filament-weight-wrap.release-temp input");
+    if (tempInput) tempInput.value = job.releaseTemp ?? job.defaultReleaseTemp ?? 29;
+
+    // ✅ Distribute
+    const distCheckbox = clone.querySelector(".distribute-checkbox");
+    if (distCheckbox) distCheckbox.checked = job.distribute;
+
+    modalContent.appendChild(clone);
+  });
+
+  initTagAndDistributeListeners(); // assumes jobs are now created and in jobDataMap
+}
 
   if (sendButton) {
     sendButton.addEventListener("click", () => {
@@ -412,107 +414,95 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
 
-  if (confirmSendBtn) {
-    confirmSendBtn.addEventListener("click", () => {
-      const confirmedJobs = [];
-      const fileItems = modal.querySelectorAll(".demo-q-file");
-
+if (confirmSendBtn) {
+  confirmSendBtn.addEventListener("click", () => {
+    const confirmedJobs = [];
+    const fileItems = modal.querySelectorAll(".demo-q-file");
 
     fileItems.forEach(item => {
-      const fileName = item.querySelector(".filename.q-send")?.textContent.trim();
-      if (!fileName) return;
+  const jobID = item.dataset.jobId;
+  if (!jobID) return;
 
-      // 🔥 Instead of creating a new job, find the existing one
-      const job = Array.from(jobDataMap.values()).find(j => j.fileName === fileName);
-      if (job) {
-        confirmedJobs.push(structuredClone(job)); // snapshot if you want to protect from future mutations
+  const job = jobDataMap.get(jobID);
+  if (job) {
+    confirmedJobs.push(job); // 👈 Do NOT clone — we want to mutate the real object
+  }
+});
+
+    console.log("Confirmed Jobs (Structured):", confirmedJobs);
+
+    // ✅ Assign jobs ONCE, before UI rendering
+    assignJobsToPrinters(confirmedJobs);
+    console.log("Jobs assigned");
+
+    const queueBackground = document.querySelector(".demo-q-background");
+    const queuedJobTemplate = document.getElementById("queued-job-template");
+
+    if (!queuedJobTemplate) {
+      console.error("Template not found!");
+      return;
+    }
+
+    confirmedJobs.forEach(job => {
+      const clone = queuedJobTemplate.cloneNode(true);
+      clone.style.display = "flex";
+      clone.removeAttribute('id');
+
+      clone.querySelector(".filename").textContent = job.fileName;
+      clone.querySelector(".jobs.ul").textContent = `${job.matchingPrinters.length} Matching`;
+
+      const tagsContainer = clone.querySelector(".tags .default-file-tags");
+      tagsContainer.querySelectorAll(".demo-tag").forEach(tag => tag.remove());
+      job.tags.forEach(tag => {
+        const tagDiv = document.createElement("div");
+        tagDiv.className = "demo-tag";
+        tagDiv.style.display = "flex";
+        tagDiv.textContent = tag;
+        tagsContainer.appendChild(tagDiv);
+      });
+
+      // Update matching printers popup
+      const popup = clone.querySelector(".matching-printers-popup");
+      const printerTextTemplate = popup.querySelector(".matching-printers-text");
+      popup.querySelectorAll(".matching-printers-text").forEach(el => el.remove());
+
+      if (job.matchingPrinterNames.length > 0) {
+        const container = popup.querySelector(".div-block-453") || popup;
+        job.matchingPrinters.forEach(p => {
+          const printerText = printerTextTemplate.cloneNode(true);
+          printerText.textContent = `${p.name} - ${p.status.toUpperCase()}`;
+          container.appendChild(printerText);
+        });
       }
+
+      const hoverTarget = clone.querySelector(".file-text.jobs.ul");
+      if (job.matchingPrinterNames.length > 0) {
+        hoverTarget.addEventListener("mouseenter", () => {
+          popup.style.display = "block";
+        });
+        hoverTarget.addEventListener("mouseleave", () => {
+          popup.style.display = "none";
+        });
+      } else {
+        popup.style.display = "none";
+      }
+
+      clone.querySelector(".qty").textContent = job.quantity;
+      clone.querySelector(".weight").textContent = job.filamentWeight || '--';
+      clone.querySelector(".time").textContent = job.printTime;
+
+      const distributeCheckbox = clone.querySelector(".file-text.jobs .w-embed input[type='checkbox']");
+      if (distributeCheckbox) {
+        distributeCheckbox.checked = job.distribute;
+      }
+
+      queueBackground.appendChild(clone);
     });
 
-
-      console.log("Confirmed Jobs (Structured):", confirmedJobs);
-
-
-      const queueBackground = document.querySelector(".demo-q-background");
-      const queuedJobTemplate = document.getElementById("queued-job-template");
-
-
-      if (!queuedJobTemplate) {
-        console.error("Template not found!");
-        return;
-      }
-
-
-      confirmedJobs.forEach(job => {
-  assignJobsToPrinters(confirmedJobs);
-        console.log("Jobs assigned");
-  const clone = queuedJobTemplate.cloneNode(true);
-  clone.style.display = "flex";
-  clone.removeAttribute('id');
-
-
-  clone.querySelector(".filename").textContent = job.fileName;
-  clone.querySelector(".jobs.ul").textContent = `${job.matchingPrinters.length} Matching`;
-
-
-  const tagsContainer = clone.querySelector(".tags .default-file-tags");
-  tagsContainer.querySelectorAll(".demo-tag").forEach(tag => tag.remove());
-  job.tags.forEach(tag => {
-    const tagDiv = document.createElement("div");
-    tagDiv.className = "demo-tag";
-    tagDiv.style.display = "flex";
-    tagDiv.textContent = tag;
-    tagsContainer.appendChild(tagDiv);
+    ["Queued", "In Production", "Collect", "Blocked"].forEach(countVisibleJobs);
   });
-
-
-  // Replace or duplicate .matching-printers-text elements
-  const popup = clone.querySelector(".matching-printers-popup");
-  const printerTextTemplate = popup.querySelector(".matching-printers-text");
-  popup.querySelectorAll(".matching-printers-text").forEach(el => el.remove());
-
-
-  if (job.matchingPrinterNames.length > 0) {
-    const container = popup.querySelector(".div-block-453") || popup;
-    job.matchingPrinters.forEach(p => {
-      const printerText = printerTextTemplate.cloneNode(true);
-      printerText.textContent = `${p.name} - ${p.status.toUpperCase()}`;
-      container.appendChild(printerText);
-    });
-  }
-
-
-  // Show popup on hover only if there are matching printers
-  const hoverTarget = clone.querySelector(".file-text.jobs.ul");
-  if (job.matchingPrinterNames.length > 0) {
-    hoverTarget.addEventListener("mouseenter", () => {
-      popup.style.display = "block";
-    });
-    hoverTarget.addEventListener("mouseleave", () => {
-      popup.style.display = "none";
-    });
-  } else {
-    popup.style.display = "none";
-  }
-
-
-  clone.querySelector(".qty").textContent = job.quantity;
-  clone.querySelector(".weight").textContent = job.filamentWeight || '--';
-  clone.querySelector(".time").textContent = job.printTime;
-  //clone.querySelector(".file-text:nth-of-type(10)").textContent = job.jobID || '--';
-
-const distributeCheckbox = clone.querySelector(".file-text.jobs .w-embed input[type='checkbox']");
-if (distributeCheckbox) {
-  distributeCheckbox.checked = job.distribute;
 }
 
-          queueBackground.appendChild(clone);
-        });
-
-
-        ["Queued", "In Production", "Collect", "Blocked"].forEach(countVisibleJobs);
-    });
-  }
 
 
   function countVisibleJobs(tabName) {
@@ -535,12 +525,14 @@ if (distributeCheckbox) {
 });
 
 
-
 // Plus/Minus Buttons for Quantity and Temp  src="https://cdn.jsdelivr.net/gh/mattea-s/af3d-demo@main/qty-temp-btn.js"
 document.addEventListener("click", function (e) {
-  const fileName = e.target.closest(".demo-q-file")
-    ?.querySelector(".filename.q-send")?.textContent.trim();
+  const fileBlock = e.target.closest(".demo-q-file");
+  const jobID = fileBlock?.dataset.jobId;
+  const job = jobID ? jobDataMap.get(jobID) : null;
+  if (!job) return;
 
+  // 🔢 Quantity
   if (e.target.matches(".qtyplus") || e.target.matches(".qtyminus")) {
     const wrapper = e.target.closest(".div-block-439.q-qty");
     const input = wrapper?.querySelector("input[type='number']");
@@ -550,18 +542,15 @@ document.addEventListener("click", function (e) {
       if (e.target.matches(".qtyminus") && value > 1) value--;
       input.value = value;
 
-      if (fileName) {
-        const job = Array.from(jobDataMap.values()).find(j => j.fileName === fileName);
-        if (job) {
-          job.quantity = value;
-          jobDataMap.set(job.jobID, structuredClone(job));
-          console.log("🔢 [jobDataMap] Updated quantity:", job.jobID, value);
-        }
-      }
+      job.quantity = value;
+      job.jobProgQueued = Math.max(0, value - (job.jobProgProd + job.jobProgCol + job.jobProgDone));
+      jobDataMap.set(jobID, structuredClone(job));
+      console.log("🔢 [jobDataMap] Updated quantity:", jobID, value);
       e.preventDefault();
     }
   }
 
+  // 🌡️ Temp
   if (e.target.matches(".tempplus") || e.target.matches(".tempminus")) {
     const wrapper = e.target.closest(".div-block-439.q-temp");
     const input = wrapper?.querySelector("input[type='number']");
@@ -571,14 +560,9 @@ document.addEventListener("click", function (e) {
       if (e.target.matches(".tempminus") && value > 0) value--;
       input.value = value;
 
-      if (fileName) {
-        const job = Array.from(jobDataMap.values()).find(j => j.fileName === fileName);
-        if (job) {
-          job.releaseTemp = value;
-          jobDataMap.set(job.jobID, structuredClone(job));
-          console.log("🌡️ [jobDataMap] Updated releaseTemp:", job.jobID, value);
-        }
-      }
+      job.releaseTemp = value;
+      jobDataMap.set(jobID, structuredClone(job));
+      console.log("🌡️ [jobDataMap] Updated releaseTemp:", jobID, value);
       e.preventDefault();
     }
   }
@@ -694,55 +678,41 @@ function removeTagFromModal(tag, container) {
 
 function initTagAndDistributeListeners() {
   document.querySelectorAll('.add-tag').forEach(addTagBtn => {
-      const fileBlock = addTagBtn.closest('.demo-q-file');
-      const modal = fileBlock.querySelector('.add-tag-modal');
-      const modalBg = fileBlock.querySelector('.tag-modal-background');
-      const currentTagsWrap = modal.querySelector('.current-tags');
-      const tagListWrap = modal.querySelector('.tag-list-wrap');
-      const fileName = fileBlock.querySelector('.filename.q-send')?.textContent.trim();
-      if (!fileName) return;
+    const fileBlock = addTagBtn.closest('.demo-q-file');
+    const jobID = fileBlock?.dataset.jobId;
+    if (!jobID) return;
 
-      let job = Array.from(jobDataMap.values()).find(j => j.fileName === fileName);
-      if (!job) {
-        const fileData = fileDataMap.get(fileName);
-        if (!fileData) return;
-        job = createJobFromFile(fileName, fileData.quantity || 1, true);
-      }
+    let job = jobDataMap.get(jobID);
+    if (!job) return;
 
-      if (!Array.isArray(job.tags)) {
-        job.tags = [...(fileDataMap.get(fileName)?.defaultTags || [])];
-        job.tagsNum = job.tags.length;
-        jobDataMap.set(job.jobID, structuredClone(job));
-      }
+    const modal = fileBlock.querySelector('.add-tag-modal');
+    const modalBg = fileBlock.querySelector('.tag-modal-background');
+    const currentTagsWrap = modal.querySelector('.current-tags');
+    const tagListWrap = modal.querySelector('.tag-list-wrap');
 
-      let jobID = job.jobID;
+    // Clean current tags in modal
+    currentTagsWrap.querySelectorAll(".demo-tag.in-modal:not([style*='display: none'])").forEach(tag => tag.remove());
+    job.tags.forEach(tag => addTagToModal(tag, currentTagsWrap));
+    updateDefaultTagsUI(fileBlock.querySelector('.default-file-tags.tags'), job.tags);
 
-      currentTagsWrap.querySelectorAll(".demo-tag.in-modal:not([style*='display: none'])").forEach(tag => tag.remove());
-      job.tags.forEach(tag => addTagToModal(tag, currentTagsWrap));
-      updateDefaultTagsUI(fileBlock.querySelector('.default-file-tags.tags'), job.tags);
-    
-      document.querySelectorAll('.distribute-checkbox').forEach(cb => {
-        cb.addEventListener('change', function () {
-          const wrapper = this.closest('.demo-q-file');
-          const fileName = wrapper.querySelector('.filename.q-send')?.textContent.trim();
-          const job = Array.from(jobDataMap.values()).find(j => j.fileName === fileName);
-          if (job) {
-            job.distribute = this.checked;
-            jobDataMap.set(job.jobID, structuredClone(job));
-            console.log("🔄 [jobDataMap] Updated distribute:", job.jobID, job.distribute);
-          }
-        });
+    // ✅ Distribute checkbox (updated to use jobID)
+    const distCheckbox = fileBlock.querySelector('.distribute-checkbox');
+    if (distCheckbox) {
+      distCheckbox.addEventListener('change', function () {
+        job.distribute = this.checked;
+        jobDataMap.set(jobID, structuredClone(job));
+        console.log("🔄 [jobDataMap] Updated distribute:", jobID, job.distribute);
       });
+    }
 
-
-
-    // On click
+    // Add tag button opens modal
     addTagBtn.addEventListener('click', e => {
       e.preventDefault();
 
       modal.style.display = 'block';
       if (modalBg) modalBg.style.display = 'block';
-      
+
+      // Show only unselected tags
       tagListWrap.querySelectorAll('.tag-name-in-list').forEach(tagEl => {
         const tag = tagEl.textContent.trim();
         const tagWrap = tagEl.closest('.tag-in-list-wrap');
@@ -750,43 +720,34 @@ function initTagAndDistributeListeners() {
         tagWrap.style.display = job.tags.includes(tag) ? 'none' : 'flex';
 
         tagEl.onclick = () => {
-            console.log("New tag clicked");
-          
-            addTagToJob(jobID, tag);
-            console.log("Tag added to job");
+          console.log("New tag clicked");
 
-            addTagToModal(tag, currentTagsWrap);
-            console.log("Tag added to modal");
+          addTagToJob(jobID, tag);
+          addTagToModal(tag, currentTagsWrap);
 
-            const defaultTagsContainer = fileBlock.querySelector('.default-file-tags.tags');
-            if (defaultTagsContainer) {
-              const updatedJob = jobDataMap.get(jobID);
-              updateDefaultTagsUI(defaultTagsContainer, updatedJob?.tags || []);
-              console.log("Tag added to default tags div");
-            }
-
-            if (tagWrap) tagWrap.style.display = 'none';
+          const defaultTagsContainer = fileBlock.querySelector('.default-file-tags.tags');
+          if (defaultTagsContainer) {
+            const updatedJob = jobDataMap.get(jobID);
+            updateDefaultTagsUI(defaultTagsContainer, updatedJob?.tags || []);
           }
-        });
+
+          if (tagWrap) tagWrap.style.display = 'none';
+        };
+      });
 
       currentTagsWrap.onclick = (e) => {
-        console.log("Remove tag clicked");
         const clicked = e.target.closest('.demo-tag.in-modal');
         if (!clicked) return;
 
         const tag = clicked.textContent.trim();
 
         removeTagFromJob(jobID, tag);
-        console.log("Tag removed from job");
-
         removeTagFromModal(tag, currentTagsWrap);
-        console.log("Tag removed from modal");
 
         const defaultTagsContainer = fileBlock.querySelector('.default-file-tags.tags');
         if (defaultTagsContainer) {
           const updatedJob = jobDataMap.get(jobID);
           updateDefaultTagsUI(defaultTagsContainer, updatedJob?.tags || []);
-          console.log("Tag removed from default tags list");
         }
 
         const restoreWrap = Array.from(tagListWrap.querySelectorAll('.tag-in-list-wrap')).find(w =>
@@ -797,92 +758,20 @@ function initTagAndDistributeListeners() {
     });
   });
 }
-
 // Sends jobs to printers and prints    src="https://cdn.jsdelivr.net/gh/mattea-s/af3d-demo@main/new-job-printer-handling.js"
-/*  function assignJobsToPrinters(jobs) {
-  console.log("🚀 Assigning jobs to printers...");
-  const assignedPrinters = new Set(); // 🔒 Prevents double assignment in this round
-
-  jobs.forEach(job => {
-    const matchingPrinters = job.matchingPrinterNames || [];
-    const quantity = job.quantity || 1;
-    const distribute = job.distribute || false;
-
-    if (matchingPrinters.length === 0) {
-      console.warn(`⚠️ No matching printers for job ${job.jobID}`);
-      return;
-    }
-
-    if (distribute) {
-      console.log(`🔄 Distribute mode for ${job.jobID}`);
-
-      const availablePrinters = matchingPrinters.filter(p => isPrinterIdle(p) && !assignedPrinters.has(p));
-      const assignableCount = Math.min(availablePrinters.length, job.jobProgQueued);
-
-      for (let i = 0; i < assignableCount; i++) {
-        const printerName = availablePrinters[i];
-        if (!printerName) break;
-
-        const printerCard = findPrinterCardByName(printerName);
-        if (!printerCard) continue;
-
-        assignedPrinters.add(printerName);
-
-        // 🧠 Immediately move one unit into production
-        job.jobProgQueued = Math.max(0, job.jobProgQueued - 1);
-        job.jobProgProd++;
-        job.jobProgressTotal = job.jobProgQueued + job.jobProgProd + job.jobProgCol + job.jobProgDone;
-
-        const printedSoFar = quantity - job.jobProgQueued;
-        populatePrinterCard(printerCard, job, printedSoFar, quantity);
-
-        console.log(`🖨️ Distributed: Assigned print #${printedSoFar} of ${job.quantity} for ${job.jobID} to ${printerName}`);
-      }
-    } else {
-      console.log(`🔒 Non-distribute mode for ${job.jobID}`);
-
-      if (job.assignedPrinterName) {
-        console.log(`Skipping ${job.jobID}, already assigned to ${job.assignedPrinterName}`);
-        return;
-      }
-
-      const availablePrinters = matchingPrinters.filter(p => isPrinterIdle(p) && !assignedPrinters.has(p));
-      const printerName = availablePrinters[0];
-      if (!printerName) {
-        console.warn(`⚠️ No available printer for non-distributed job ${job.jobID}`);
-        return;
-      }
-
-      const printerCard = findPrinterCardByName(printerName);
-      if (!printerCard) return;
-
-      assignedPrinters.add(printerName);
-
-      // 🔒 Lock printer to this job
-      job.assignedPrinterName = printerName;
-
-      // ✅ Only one print at a time
-      job.jobProgQueued = Math.max(0, job.jobProgQueued - 1);
-      job.jobProgProd++;
-      job.jobProgressTotal = job.jobProgQueued + job.jobProgProd + job.jobProgCol + job.jobProgDone;
-
-      populatePrinterCard(printerCard, job, 1, quantity);
-
-      console.log(`🖨️ Non-distributed: Started first print of ${job.jobID} (${quantity} total) on ${printerName}`);
-    }
-  });
-}*/
-
 function assignJobsToPrinters(jobs) {
   console.log("🚀 Assigning jobs to printers...");
 
-  const assignedPrinters = new Set(); // Only for this assignment pass
+  const assignedPrinters = new Set(); // Used only during this assignment pass
 
   for (const job of jobs) {
     const matchingPrinters = job.matchingPrinterNames || [];
-    const quantityRemaining = job.jobProgQueued;
 
-    if (matchingPrinters.length === 0 || quantityRemaining <= 0) {
+    // ✅ Recalculate queued iterations based on quantity and current progress
+    const totalProgress = job.jobProgProd + job.jobProgCol + job.jobProgDone;
+    job.jobProgQueued = Math.max(0, job.quantity - totalProgress);
+
+    if (matchingPrinters.length === 0 || job.jobProgQueued <= 0) {
       continue;
     }
 
@@ -891,27 +780,25 @@ function assignJobsToPrinters(jobs) {
     );
 
     if (job.distribute) {
-      const assignCount = Math.min(availablePrinters.length, quantityRemaining);
+      const assignCount = Math.min(availablePrinters.length, job.jobProgQueued);
 
       for (let i = 0; i < assignCount; i++) {
         const printerName = availablePrinters[i];
         const printerCard = findPrinterCardByName(printerName);
         if (!printerCard) continue;
 
-        // ✅ Mark printer assigned for this batch
+        // Mark this printer as taken during this pass
         assignedPrinters.add(printerName);
 
-        // ✅ Update job progress
+        // Move one iteration into production
         job.jobProgQueued = Math.max(0, job.jobProgQueued - 1);
         job.jobProgProd++;
-        job.jobProgressTotal =
-          job.jobProgQueued + job.jobProgProd + job.jobProgCol + job.jobProgDone;
+        job.jobProgressTotal = job.jobProgQueued + job.jobProgProd + job.jobProgCol + job.jobProgDone;
 
         const printedSoFar = job.quantity - job.jobProgQueued;
 
         populatePrinterCard(printerCard, job, printedSoFar, job.quantity);
 
-        // ✅ Track printer for collection
         if (!job.assignedPrinterNames.includes(printerName)) {
           job.assignedPrinterNames.push(printerName);
         }
@@ -920,35 +807,32 @@ function assignJobsToPrinters(jobs) {
       }
 
     } else {
-      // Non-distributed job — must go to a single printer
+      // Non-distributed job: entire job goes to one printer
       if (job.assignedPrinterName) {
-        console.log(`🔒 Job ${job.jobID} already assigned to ${job.assignedPrinterName}`);
+        console.log(`🔒 Job ${job.jobID} already locked to ${job.assignedPrinterName}`);
         continue;
       }
 
       const printerName = availablePrinters[0];
       if (!printerName) {
-        console.warn(`⚠️ No idle compatible printer for non-distributed job ${job.jobID}`);
+        console.warn(`⚠️ No IDLE compatible printer for non-distributed job ${job.jobID}`);
         continue;
       }
 
       const printerCard = findPrinterCardByName(printerName);
       if (!printerCard) continue;
 
-      // ✅ Mark printer assigned for this batch
       assignedPrinters.add(printerName);
 
-      // ✅ Lock job to this printer
+      // Lock this printer to the job
       job.assignedPrinterName = printerName;
 
       job.jobProgQueued = Math.max(0, job.jobProgQueued - 1);
       job.jobProgProd++;
-      job.jobProgressTotal =
-        job.jobProgQueued + job.jobProgProd + job.jobProgCol + job.jobProgDone;
+      job.jobProgressTotal = job.jobProgQueued + job.jobProgProd + job.jobProgCol + job.jobProgDone;
 
       populatePrinterCard(printerCard, job, 1, job.quantity);
 
-      // ✅ Track printer for collection
       if (!job.assignedPrinterNames.includes(printerName)) {
         job.assignedPrinterNames.push(printerName);
       }
